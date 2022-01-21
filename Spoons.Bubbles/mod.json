@@ -1,0 +1,28 @@
+{
+    "Name": "Spoons.Bubbles",
+    "Description": "Allows users to have customisable dome shield colours!* \n \n To set a colour manually**, type \"AddCustomBubble <r> <g> <b>\" \n Example: \"AddCustomBubble 255 0 255\" \n (This is useful for finding a colour that you like) \n \n To automatically set your colour when you join a server, go to \n .../R2Northstar/mods/Spoons.Bubbles/mod/cfg/autoexec_spoons_bubbles.cfg \n \n \n \n \n \n \n *your custom colour will only function if the server is also running the mod \n **a colour set this way will be reset when the match ends",
+    "Version": "1.0.0",
+
+    "LoadPriority": 2,
+    "ConVars": 
+    [
+        {
+            "Name": "bubbleColour",
+            "DefaultValue": "0 0 0"
+        }
+    ],
+    "Scripts": 
+    [
+        {
+          "Path": "cl_bubbles.nut",
+          "RunOn": "( CLIENT ) && MP",
+          "ClientCallback": {
+            "Before": "cl_bubbles_init"
+          }
+        }
+    ],
+    "Localisation": 
+    [
+        
+    ]
+}
