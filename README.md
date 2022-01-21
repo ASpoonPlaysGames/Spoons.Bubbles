@@ -16,12 +16,12 @@ Note: your custom colour will not work if the server does not have Spoons.Bubble
 
 You can use the .cfg file found at `.../R2Northstar/mods/Spoons.Bubbles/mod/cfg/autoexec_spoons_bubbles.cfg` to set your dome shield colour on a permanent basis.
 
-##Usage:
+### Usage:
 1. Navigate to `.../R2Northstar/mods/Spoons.Bubbles/mod/cfg` and open the file `autoexec_spoons_bubbles.cfg` with a text editor (notepad, vscode, etc.)
 2. Make note of the commented text in the file
 3. Replace "0 0 0" with the r, g, and b values that you want for your dome shield
 
-##Example:
+### Example:
 This will set the dome shield colour to an orange
 ![image](https://user-images.githubusercontent.com/66967891/150456117-23d187b1-a874-4612-ad06-86b658c4905d.png)
 
@@ -31,7 +31,7 @@ This will set the dome shield colour to an orange
 Using AddCustomBubble is a quick and easy way to change your dome shield colour mid-match, however it will be reset when the match ends, or you leave the server. 
 Basically any time that you see a loading screen, AddCustomBubble will have been reset
 
-##Usage: 
+### Usage: 
 `AddCustomBubble <r> <g> <b>`
 
 ##Example:
@@ -42,9 +42,9 @@ Basically any time that you see a loading screen, AddCustomBubble will have been
 
 Using bubbleColour is an easy way to set your custom colour for a play session. It is reset when the game is rebooted, but persists across matches.
 
-##Usage:
+### Usage:
 `customColour <r> <g> <b>`
 
-##Example:
+### Example:
 "customColour 255 255 255" will set your dome shield to be white until Titanfall 2 is closed
 ![image](https://user-images.githubusercontent.com/66967891/150455722-72e4725d-c230-4bd9-8f07-3ddd476423f8.png)
