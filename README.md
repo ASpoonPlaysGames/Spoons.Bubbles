@@ -29,7 +29,7 @@ This will set the dome shield colour to an orange
 ![image](https://user-images.githubusercontent.com/66967891/150456117-23d187b1-a874-4612-ad06-86b658c4905d.png)
 
 
-## Using AddCustomBubble
+## Using AddCustomBubble THIS MIGHT NOT BE WORKING RIGHT NOW
 
 Using AddCustomBubble is a quick and easy way to change your dome shield colour mid-match, however it will be reset when the match ends, or you leave the server. 
 Basically any time that you see a loading screen, AddCustomBubble will have been reset
@@ -38,19 +38,19 @@ Basically any time that you see a loading screen, AddCustomBubble will have been
 `AddCustomBubble <r> <g> <b>`
 
 ### Example:
-"AddCustomBubble 255 0 255" will make a pink dome shield until the match ends
+"AddCustomBubble 255 0 255" will make a pink dome shield
 
 ![image](https://user-images.githubusercontent.com/66967891/150455494-a8702efc-4d00-43aa-9142-67e27d349c71.png)
 
 ## Using bubbleColour
 
-Using bubbleColour is an easy way to set your custom colour for a play session. It is reset when the game is rebooted, but persists across matches.
+Using bubbleColour is an easy way to set your custom colour for a play session. It works in a similar way to AddCustomBubble (but actually works lmao)
 
 ### Usage:
 `customColour <r> <g> <b>`
 
 ### Example:
-"customColour 255 255 255" will set your dome shield to be white until Titanfall 2 is closed
+"customColour 255 255 255" will set your dome shield to be white
 
 ![image](https://user-images.githubusercontent.com/66967891/150455722-72e4725d-c230-4bd9-8f07-3ddd476423f8.png)
 
