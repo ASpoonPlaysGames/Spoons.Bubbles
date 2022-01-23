@@ -39,6 +39,10 @@
         {
           "Name": "spn_animated_dark_dome_limit",
           "DefaultValue": "1"
+        },
+        {
+          "Name": "spn_aliases",
+          "DefaultValue": ""
         }
     ],
     "Scripts": 

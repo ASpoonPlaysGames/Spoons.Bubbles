@@ -54,8 +54,37 @@ void function BubbleShield_Init()
 
 	AddClientCommandCallback( "AddCustomBubble", AddCustomBubble )
 	AddClientCommandCallback( "AddCustomAnimBubble", AddCustomAnimBubble )
+	AddClientCommandCallback( "SetCustomBubble", SetCustomBubble )
+	AddClientCommandCallback( "SetCustomAnimBubble", SetCustomAnimBubble )
 	ServerCommand("exec server/autoexec_spoons_bubbles_server")
+	ServerCommand("exec server/autoexec_spoons_bubbles_aliases")
+	thread InitAliases()
 	AddDefaultAnimBubble()
+}
+
+bool function SetCustomBubble( entity player, array<string> args )
+{
+	// construct string from args
+	string commandString
+	foreach (string arg in args)
+	{
+		commandString = commandString + " " + arg
+	}
+	
+	ClientCommand( player, "bubbleColour " + commandString)
+	return AddCustomBubble( player, args )
+}
+bool function SetCustomAnimBubble( entity player, array<string> args )
+{
+	// construct string from args
+	string commandString
+	foreach (string arg in args)
+	{
+		commandString = commandString + " " + arg
+	}
+	
+	ClientCommand( player, "anim_bubbleColour " + commandString)
+	return AddCustomAnimBubble( player, args )
 }
 
 void function InitBubbleShieldDamageStructValues( BubbleShieldDamageStruct damageStruct, float damageFloor, float damageCeiling, array<float> quadPolynomialCoeffs )
@@ -471,63 +500,25 @@ void function rainbowBubble( array<entity> local_bubbleShieldFXs ) //
 
 table<int, array<bubbleShieldColour> > CustomBubbleColours;
 
+table<string, array<bubbleShieldColour> > aliases
 
-
-
-bool function AddCustomBubble(entity player, array<string> commandInput )
+void function InitAliases()
 {
-	if (GetConVarInt("spn_override_custom_bubble") == 1)
-		return false
-    try {
+	wait 1 // this is bad code but it works lol @TODO FIX THIS
+	// get alias list from convar
+	string rawAliasList = GetConVarString("spn_aliases")
+	// split into different alias definitions
+	array<string> aliasList = split(rawAliasList, ",")
+	// iterate through each alias definition
+	foreach (string alias in aliasList)
+	{
+		array<string> aliasArgs = split(alias, "_")
+		string aliasColours = aliasArgs[0]
+		// construct array of bubbleShieldColour from aliasColours
 		// make array of bubbleColour
 		array<bubbleShieldColour> bubbleColourArray
-
-		// make bubbleColour
-		bubbleShieldColour bubbleColour
-        // construct colour vector
-		bubbleColour.colour = < float(commandInput[0]), float(commandInput[1]), float(commandInput[2]) >
-		// set to non animated
-		bubbleColour.colourChangeTime = 0
-
-		// add bubbleColour to the array
-		bubbleColourArray.append(bubbleColour)
-		if (IsVectorTooDark(bubbleColour.colour))
-			return false
-		// put into table
-		CustomBubbleColours[player.GetEncodedEHandle()] <- bubbleColourArray
-
-        return true
-    }
-    catch (exception)
-    {
-        printt("ERROR LOADING DOME COLOUR")
-        SendHudMessage( player, "There was an error loading your custom dome shield colour", -1, 0.4, 200, 0, 0, 255, 0.15, 5.0, 0.5 )
-        return false
-    }
-	unreachable
-	
-}
-
-bool function AddCustomAnimBubble(entity player, array<string> commandInput )
-{
-    // animated bubble shields allowed
-	if (GetConVarInt("spn_allow_animated_colours") == 0)
-		return false
-	if (GetConVarInt("spn_override_custom_bubble") == 1)
-		return false
-	float timeDarkInRow = 0;
-	try {
-		// make array of bubbleColour
-		array<bubbleShieldColour> bubbleColourArray
-		// turn the args into one string
-		string args = ""
-		foreach (string arg in commandInput)
-		{
-			args = args + " " + arg
-		}
-		args = strip(args)
-		// split the args into "frames" of animation
-		array<string> frames = split(args, "|")
+		// split the aliasColours into "frames" of animation
+		array<string> frames = split(aliasColours, "|")
 		foreach (string frame in frames)
 		{
 			array<string> frameData = split(frame, " ")
@@ -536,7 +527,7 @@ bool function AddCustomAnimBubble(entity player, array<string> commandInput )
 				printt("ERROR LOADING FRAME")
 				continue
 			}
-				
+			float timeDarkInRow = 0	
 			// make bubbleColour
 			bubbleShieldColour bubbleColour
         	// construct colour vector
@@ -559,18 +550,137 @@ bool function AddCustomAnimBubble(entity player, array<string> commandInput )
 			if (bubbleColour.colourChangeTime == 0) // the animation will stop here, so no need to continue adding to the array
 				break
 		}
-		
-		// put into table
-		CustomBubbleColours[player.GetEncodedEHandle()] <- bubbleColourArray
+		// iterate through rest of the aliasArgs, and add the array of bubbleShieldColours to the table
+		for (int i = 1; i < aliasArgs.len(); i++)
+		{
+			string aliasName = aliasArgs[i]
+			printt(aliasName)
+			aliases[aliasName] <- bubbleColourArray
+		}
+	}
+}
 
-        return true
-    }
-    catch (exception)
-    {
-        printt("ERROR LOADING DOME COLOUR")
-        SendHudMessage( player, "There was an error loading your custom dome shield colour", -1, 0.4, 200, 0, 0, 255, 0.15, 5.0, 0.5 )
-        return false
-    }
+bool function AddCustomBubble(entity player, array<string> commandInput )
+{
+	if (GetConVarInt("spn_override_custom_bubble") == 1)
+		return false
+	
+	try
+	{
+		CustomBubbleColours[player.GetEncodedEHandle()] <- aliases[commandInput[0]]
+		return true
+	}
+	catch (exception)
+	{
+		try {
+			// make array of bubbleColour
+			array<bubbleShieldColour> bubbleColourArray
+
+			// make bubbleColour
+			bubbleShieldColour bubbleColour
+        	// construct colour vector
+			bubbleColour.colour = < float(commandInput[0]), float(commandInput[1]), float(commandInput[2]) >
+			// set to non animated
+			bubbleColour.colourChangeTime = 0
+
+			// add bubbleColour to the array
+			bubbleColourArray.append(bubbleColour)
+			if (IsVectorTooDark(bubbleColour.colour))
+				return false
+			// put into table
+			CustomBubbleColours[player.GetEncodedEHandle()] <- bubbleColourArray
+
+        	return true
+    	}
+    	catch (exception)
+    	{
+    		printt("ERROR LOADING DOME COLOUR")
+    	    SendHudMessage( player, "There was an error loading your custom dome shield colour", -1, 0.4, 200, 0, 0, 255, 0.15, 5.0, 0.5 )
+    	    return false
+    	}
+	}
+	
+
+	
+    
+	unreachable
+	
+}
+
+bool function AddCustomAnimBubble(entity player, array<string> commandInput )
+{
+    // animated bubble shields allowed
+	if (GetConVarInt("spn_allow_animated_colours") == 0)
+		return false
+	if (GetConVarInt("spn_override_custom_bubble") == 1)
+		return false
+	
+	try
+	{
+		
+		CustomBubbleColours[player.GetEncodedEHandle()] <- aliases[commandInput[0]]
+		return true
+	}
+	catch (exception)
+	{
+
+		float timeDarkInRow = 0;
+		try {
+			// make array of bubbleColour
+			array<bubbleShieldColour> bubbleColourArray
+			// turn the args into one string
+			string args = ""
+			foreach (string arg in commandInput)
+			{
+				args = args + " " + arg
+			}
+			args = strip(args)
+			// split the args into "frames" of animation
+			array<string> frames = split(args, "|")
+			foreach (string frame in frames)
+			{
+				array<string> frameData = split(frame, " ")
+				if (frameData.len() != 4)
+				{	
+					printt("ERROR LOADING FRAME")
+					continue
+				}
+
+				// make bubbleColour
+				bubbleShieldColour bubbleColour
+    	    	// construct colour vector
+				bubbleColour.colour = < float(frameData[0]), float(frameData[1]), float(frameData[2]) >
+				// set to non animated
+				bubbleColour.colourChangeTime = float(frameData[3])
+				if (IsVectorTooDark(bubbleColour.colour))
+				{
+					timeDarkInRow = timeDarkInRow + bubbleColour.colourChangeTime
+				}
+				else
+				{
+					timeDarkInRow = 0
+				}
+
+				// add bubbleColour to the array
+				if (timeDarkInRow < GetConVarInt("spn_animated_dark_dome_limit"))
+					bubbleColourArray.append(bubbleColour)
+
+				if (bubbleColour.colourChangeTime == 0) // the animation will stop here, so no need to continue adding to the array
+					break
+			}
+
+			// put into table
+			CustomBubbleColours[player.GetEncodedEHandle()] <- bubbleColourArray
+
+    	    return true
+    	}
+    	catch (exception)
+    	{
+    	    printt("ERROR LOADING DOME COLOUR")
+    	    SendHudMessage( player, "There was an error loading your custom dome shield colour", -1, 0.4, 200, 0, 0, 255, 0.15, 5.0, 0.5 )
+    	    return false
+    	}
+	}
 	unreachable
 }
 
@@ -681,6 +791,8 @@ int function ShouldUseCustomColourStatic( entity player )
 int function ShouldUseCustomColourAnim( entity player ) // if this returns false, it should fall back on ShouldUseCustomColourStatic
 {
 	if (GetConVarInt("spn_allow_animated_colours") == 0)
+		return ShouldUseCustomColourStatic( player )
+	if (CustomBubbleColours[player.GetEncodedEHandle()].len() < 2)
 		return ShouldUseCustomColourStatic( player )
 	return 2
 }
