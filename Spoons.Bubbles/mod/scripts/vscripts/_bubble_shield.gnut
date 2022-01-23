@@ -53,6 +53,9 @@ void function BubbleShield_Init()
 	// custom bubble colours poggers
 
 	AddClientCommandCallback( "AddCustomBubble", AddCustomBubble )
+	AddClientCommandCallback( "AddCustomAnimBubble", AddCustomAnimBubble )
+	ServerCommand("exec server/autoexec_spoons_bubbles_server")
+	AddDefaultAnimBubble()
 }
 
 void function InitBubbleShieldDamageStructValues( BubbleShieldDamageStruct damageStruct, float damageFloor, float damageCeiling, array<float> quadPolynomialCoeffs )
@@ -252,31 +255,54 @@ entity function CreateBubbleShieldWithSettings( int team, vector origin, vector 
 		
         int shouldUseCustomColour = ShouldUseCustomColour( owner ) // should we use a custom bubble colour?
         
+		
 
         switch (shouldUseCustomColour)
         {
             case 0:
                 EffectSetControlPointVector(  friendlyColoredFX, 1, FRIENDLY_COLOR_FX ) //  doesnt particularly matter what the colours are here
                 EffectSetControlPointVector(  enemyColoredFX, 1, ENEMY_COLOR_FX )
+				appendThings( bubbleShieldFXs, bubbleShieldDotS, friendlyColoredFX, enemyColoredFX ) 
+				thread rainbowBubble( bubbleShieldFXs )
                 break
             case 1:
                 EffectSetControlPointVector(  friendlyColoredFX, 1, GetCustomBubbleColour( owner ) )
                 EffectSetControlPointVector(  enemyColoredFX, 1, GetCustomBubbleColour( owner ) )
+				appendThings( bubbleShieldFXs, bubbleShieldDotS, friendlyColoredFX, enemyColoredFX )
                 break
-            default: // default to vanilla colours
-                EffectSetControlPointVector(  friendlyColoredFX, 1, FRIENDLY_COLOR_FX )
-                EffectSetControlPointVector(  enemyColoredFX, 1, ENEMY_COLOR_FX )
+			case 2:
+				EffectSetControlPointVector(  friendlyColoredFX, 1, GetCustomBubbleColour( owner ) )
+                EffectSetControlPointVector(  enemyColoredFX, 1, GetCustomBubbleColour( owner ) )
+				appendThings( bubbleShieldFXs, bubbleShieldDotS, friendlyColoredFX, enemyColoredFX ) 
+				// add animations on a thread
+				thread bubbleAnim( bubbleShieldFXs, owner.GetEncodedEHandle() )
+				break
+            default: // use defaults
+				switch (GetConVarInt("spn_use_default_bubble_colour"))
+				{
+					case 0:	// if set to not use a custom default
+						EffectSetControlPointVector(  friendlyColoredFX, 1, FRIENDLY_COLOR_FX )
+                		EffectSetControlPointVector(  enemyColoredFX, 1, ENEMY_COLOR_FX )
+						appendThings( bubbleShieldFXs, bubbleShieldDotS, friendlyColoredFX, enemyColoredFX ) 
+						break
+					case 1: // if set to use a custom default (static)
+						EffectSetControlPointVector(  friendlyColoredFX, 1, GetDefaultColour() )
+                		EffectSetControlPointVector(  enemyColoredFX, 1, GetDefaultColour() )
+						appendThings( bubbleShieldFXs, bubbleShieldDotS, friendlyColoredFX, enemyColoredFX ) 
+						break
+					case 2: // if set to use a custom default (animated)
+						EffectSetControlPointVector(  friendlyColoredFX, 1, GetDefaultAnimColour() )
+                		EffectSetControlPointVector(  enemyColoredFX, 1, GetDefaultAnimColour() )
+						appendThings( bubbleShieldFXs, bubbleShieldDotS, friendlyColoredFX, enemyColoredFX )
+						thread bubbleAnim( bubbleShieldFXs, -1 ) // -1 meaning default, unsure if EncodedEHandles can be negative, hoping they cant
+						break
+					default: // something went wrong, just use normal vanilla defaults
+						EffectSetControlPointVector(  friendlyColoredFX, 1, FRIENDLY_COLOR_FX )
+                		EffectSetControlPointVector(  enemyColoredFX, 1, ENEMY_COLOR_FX )
+						appendThings( bubbleShieldFXs, bubbleShieldDotS, friendlyColoredFX, enemyColoredFX ) 
+					break
+				}
                 break
-        }
-
-		bubbleShieldDotS.friendlyColoredFX <- friendlyColoredFX
-		bubbleShieldDotS.enemyColoredFX <- enemyColoredFX
-		bubbleShieldFXs.append( friendlyColoredFX )
-		bubbleShieldFXs.append( enemyColoredFX )
-
-        if (shouldUseCustomColour == 0)
-        {
-            thread rainbowBubble( bubbleShieldFXs )
         }
 	}
 
@@ -293,7 +319,68 @@ entity function CreateBubbleShieldWithSettings( int team, vector origin, vector 
 	return bubbleShield
 }
 
-void function rainbowBubble( array<entity> local_bubbleShieldFXs )
+void function appendThings( array<entity> local_bubbleShieldFXs, table local_bubbleShieldDotS, entity local_friendlyColoredFX, entity local_enemyColoredFX)
+{
+	local_bubbleShieldDotS.friendlyColoredFX <- local_friendlyColoredFX
+	local_bubbleShieldDotS.enemyColoredFX <- local_enemyColoredFX
+	local_bubbleShieldFXs.append( local_friendlyColoredFX )
+	local_bubbleShieldFXs.append( local_enemyColoredFX )
+}
+
+struct bubbleShieldColour
+{
+	vector colour
+	float colourChangeTime
+}
+
+void function bubbleAnim( array<entity> local_bubbleShieldFXs, int EncodedEHandle)
+{
+	// get array of colours
+	array<bubbleShieldColour> bubbleShieldColours = CustomBubbleColours[EncodedEHandle]
+	int i = 0 // current "frame" index
+	int j = 1 // next "frame" index
+
+	float thisColourTime = Time()
+	float nextColourTime = thisColourTime + bubbleShieldColours[i].colourChangeTime
+	
+	while ( IsValid_ThisFrame( local_bubbleShieldFXs[0] ) )
+	{
+		if (Time() > nextColourTime)
+		{
+			// increment i and j 
+			i = j
+			j = (j + 1) % bubbleShieldColours.len()
+			// recalculate thisColourTime and nextColourTime
+			thisColourTime = nextColourTime
+			nextColourTime = thisColourTime + bubbleShieldColours[i].colourChangeTime
+		}
+		if (bubbleShieldColours[i].colourChangeTime <= 0)
+		{
+			EffectSetControlPointVector(  local_bubbleShieldFXs[0], 1, bubbleShieldColours[i].colour )
+			EffectSetControlPointVector(  local_bubbleShieldFXs[1], 1, bubbleShieldColours[i].colour )
+			break
+		}
+		// get how far through the transition from thisColourTime to nextColourTime
+		float timeFromThis = Time() - thisColourTime
+		float timeToNext = nextColourTime - Time()
+
+		float timeFromThis_Ratio = timeFromThis / bubbleShieldColours[i].colourChangeTime
+		float timeToNext_Ratio = timeToNext / bubbleShieldColours[i].colourChangeTime
+		
+		
+		// multiply the two colours by the ratios and add them
+		vector colour = bubbleShieldColours[i].colour * timeToNext_Ratio + bubbleShieldColours[j].colour * timeFromThis_Ratio
+		
+		
+		//update bubble colour
+		EffectSetControlPointVector(  local_bubbleShieldFXs[0], 1, colour )
+		EffectSetControlPointVector(  local_bubbleShieldFXs[1], 1, colour )
+		WaitFrame()
+	}
+	
+}
+
+void function rainbowBubble( array<entity> local_bubbleShieldFXs ) // 
 {
 	//int red = 255
 	int red = 0
@@ -307,30 +394,12 @@ void function rainbowBubble( array<entity> local_bubbleShieldFXs )
 
 	int step = 32
 
-	//strobe toggle
-	int toggle = 0
 	while ( IsValid_ThisFrame( local_bubbleShieldFXs[0] ) )
 	{	
 
 		
 		if ( IsValid_ThisFrame( local_bubbleShieldFXs[0] ) )
 		{
-			/*if (toggle == 0)
-			{
-				toggle = 1
-				red = 255
-				blue = 255
-				green = 255
-			}
-			else
-			{
-				toggle = 0
-				red = 0
-				green = 0
-				blue = 0
-			}*/ //strobe things
-			
-			
 			//calculate bubble colour
 			red = red + step * redMult;
    			green = green + step * greenMult;
@@ -398,22 +467,40 @@ void function rainbowBubble( array<entity> local_bubbleShieldFXs )
 
 // i like the ascii art even tho it really adds nothing
 
-table CustomBubbleColours;
+
+
+table<int, array<bubbleShieldColour> > CustomBubbleColours;
+
 
 
 
 bool function AddCustomBubble(entity player, array<string> commandInput )
 {
+	if (GetConVarInt("spn_override_custom_bubble") == 1)
+		return false
     try {
-        printt(float(commandInput[0]) + "," + float(commandInput[1]) + "," + float(commandInput[2]))
-        // i hate that i have to turn the args into floats, and then into a string, seems inefficient, but id rather verify that they are numbers now
-        string colour = float(commandInput[0]) + "," + float(commandInput[1]) + "," + float(commandInput[2])
-        CustomBubbleColours[player.GetEncodedEHandle()] <- colour
+		// make array of bubbleColour
+		array<bubbleShieldColour> bubbleColourArray
+
+		// make bubbleColour
+		bubbleShieldColour bubbleColour
+        // construct colour vector
+		bubbleColour.colour = < float(commandInput[0]), float(commandInput[1]), float(commandInput[2]) >
+		// set to non animated
+		bubbleColour.colourChangeTime = 0
+
+		// add bubbleColour to the array
+		bubbleColourArray.append(bubbleColour)
+		if (IsVectorTooDark(bubbleColour.colour))
+			return false
+		// put into table
+		CustomBubbleColours[player.GetEncodedEHandle()] <- bubbleColourArray
+
         return true
     }
     catch (exception)
     {
-        printt("ERROR")
+        printt("ERROR LOADING DOME COLOUR")
         SendHudMessage( player, "There was an error loading your custom dome shield colour", -1, 0.4, 200, 0, 0, 255, 0.15, 5.0, 0.5 )
         return false
     }
@@ -421,44 +508,186 @@ bool function AddCustomBubble(entity player, array<string> commandInput )
 	
 }
 
-int function ShouldUseCustomColour( entity player ) // returning -1 means to default to the normal colours, 0 means to use rainbow, and 1 means to use predetermined colour
+bool function AddCustomAnimBubble(entity player, array<string> commandInput )
 {
-    try {
-        string colour = string( CustomBubbleColours[player.GetEncodedEHandle()] )
-        printt(colour)
-        vector colourvec = StringToVec( colour )
-		if (colourvec.x + colourvec.y + colourvec.z == 0)
+    // animated bubble shields allowed
+	if (GetConVarInt("spn_allow_animated_colours") == 0)
+		return false
+	if (GetConVarInt("spn_override_custom_bubble") == 1)
+		return false
+	float timeDarkInRow = 0;
+	try {
+		// make array of bubbleColour
+		array<bubbleShieldColour> bubbleColourArray
+		// turn the args into one string
+		string args = ""
+		foreach (string arg in commandInput)
 		{
-			SendHudMessage( player, "Set a custom dome shield colour at \n R2Northstar/mods/Spoons.Bubbles/mod/cfg/autoexec_spoons_bubbles.cfg \n defaulting to rainbow...", -1, 0.4, 200, 0, 0, 255, 0.15, 8.0, 0.5 )
-			return 0
+			args = args + " " + arg
 		}
-        else if (colourvec.x + colourvec.y + colourvec.z < 150)
-        {
-            SendHudMessage( player, "Your custom dome shield colour is too dark, \n defaulting to rainbow...", -1, 0.4, 200, 0, 0, 255, 0.15, 5.0, 0.5 )
-            return 0
-        }
-		else if (colourvec.x + colourvec.y + colourvec.z == -3)
+		args = strip(args)
+		// split the args into "frames" of animation
+		array<string> frames = split(args, "|")
+		foreach (string frame in frames)
 		{
-			return 0
+			array<string> frameData = split(frame, " ")
+			if (frameData.len() != 4)
+			{	
+				printt("ERROR LOADING FRAME")
+				continue
+			}
+				
+			// make bubbleColour
+			bubbleShieldColour bubbleColour
+        	// construct colour vector
+			bubbleColour.colour = < float(frameData[0]), float(frameData[1]), float(frameData[2]) >
+			// set to non animated
+			bubbleColour.colourChangeTime = float(frameData[3])
+			if (IsVectorTooDark(bubbleColour.colour))
+			{
+				timeDarkInRow = timeDarkInRow + bubbleColour.colourChangeTime
+			}
+			else
+			{
+				timeDarkInRow = 0
+			}
+			
+			// add bubbleColour to the array
+			if (timeDarkInRow < GetConVarInt("spn_animated_dark_dome_limit"))
+				bubbleColourArray.append(bubbleColour)
+
+			if (bubbleColour.colourChangeTime == 0) // the animation will stop here, so no need to continue adding to the array
+				break
 		}
-        else
-        {
-            return 1
-        }
-        
+		
+		// put into table
+		CustomBubbleColours[player.GetEncodedEHandle()] <- bubbleColourArray
+
+        return true
     }
     catch (exception)
     {
-        
-        
+        printt("ERROR LOADING DOME COLOUR")
+        SendHudMessage( player, "There was an error loading your custom dome shield colour", -1, 0.4, 200, 0, 0, 255, 0.15, 5.0, 0.5 )
+        return false
+    }
+	unreachable
+}
+
+void function AddDefaultAnimBubble()
+{
+    // animated bubble shields allowed
+	float timeDarkInRow = 0;
+	try {
+		// make array of bubbleColour
+		array<bubbleShieldColour> bubbleColourArray
+		// turn the args into one string
+		string args = GetConVarString("spn_default_anim_bubble_colour")
+		args = strip(args)
+		// split the args into "frames" of animation
+		array<string> frames = split(args, "|")
+		foreach (string frame in frames)
+		{
+			array<string> frameData = split(frame, " ")
+			if (frameData.len() != 4)
+			{	
+				printt("ERROR LOADING FRAME")
+				continue
+			}
+				
+			// make bubbleColour
+			bubbleShieldColour bubbleColour
+        	// construct colour vector
+			bubbleColour.colour = < float(frameData[0]), float(frameData[1]), float(frameData[2]) >
+			// set to non animated
+			bubbleColour.colourChangeTime = float(frameData[3])
+			if (IsVectorTooDark(bubbleColour.colour))
+			{
+				timeDarkInRow = timeDarkInRow + bubbleColour.colourChangeTime
+			}
+			else
+			{
+				timeDarkInRow = 0
+			}
+			
+			// add bubbleColour to the array
+			if (timeDarkInRow < GetConVarInt("spn_animated_dark_dome_limit"))
+				bubbleColourArray.append(bubbleColour)
+
+			if (bubbleColour.colourChangeTime == 0) // the animation will stop here, so no need to continue adding to the array
+				break
+		}
+		
+		// put into table
+		CustomBubbleColours[-1] <- bubbleColourArray
+
+    }
+    catch (exception)
+    {
+        printt("ERROR LOADING DOME COLOUR")
+    }
+}
+
+bool function IsVectorTooDark(vector colour)
+{
+	if ( sqrt( pow(colour.x, 2) + pow(colour.y, 2) + pow(colour.z, 2) ) < 50)
+	{
+		return true
+	}
+	return false
+}
+
+int function ShouldUseCustomColour( entity player ) // returning -1 means to use default, 0 means to use rainbow, and 1 means to use predetermined colour
+{
+	if (GetConVarInt("spn_override_custom_bubble") == 1)
+		return -1
+    try {
+		
+        return ShouldUseCustomColourAnim( player )
+    }
+    catch (exception) // if the colour doesnt exist, or something else bad happens
+    {
         return -1
     }
 }
 
+int function ShouldUseCustomColourStatic( entity player )
+{
+	// get data from table
+	array<bubbleShieldColour> colours = CustomBubbleColours[player.GetEncodedEHandle()]
+	vector colourvec = colours[0].colour // idk if this is good, but yeah
+    
+    
+	if (colourvec.x + colourvec.y + colourvec.z == 0)
+	{
+		SendHudMessage( player, "Set a custom dome shield colour at \n R2Northstar/mods/Spoons.Bubbles/mod/cfg/autoexec_spoons_bubbles.cfg \n defaulting to rainbow...", -1, 0.4, 200, 0, 0, 255, 0.15, 8.0, 0.5 )
+		return 0
+	}
+    else if (colourvec.x + colourvec.y + colourvec.z < 150)
+    {
+        SendHudMessage( player, "Your custom dome shield colour is too dark, \n defaulting to rainbow...", -1, 0.4, 200, 0, 0, 255, 0.15, 5.0, 0.5 )
+        return 0
+    }
+	else if (colourvec.x + colourvec.y + colourvec.z == -3)
+	{
+		return 0
+	}
+    else
+    {
+        return 1
+    }
+	unreachable
+}
+int function ShouldUseCustomColourAnim( entity player ) // if this returns false, it should fall back on ShouldUseCustomColourStatic
+{
+	if (GetConVarInt("spn_allow_animated_colours") == 0)
+		return ShouldUseCustomColourStatic( player )
+	return 2
+}
+
 vector function GetCustomBubbleColour( entity player )
 {
-    vector colour = StringToVec( string( CustomBubbleColours[player.GetEncodedEHandle()] ) )
-    printt(colour)
+    vector colour = CustomBubbleColours[player.GetEncodedEHandle()][0].colour
     return colour
 }
 
@@ -468,7 +697,17 @@ vector function StringToVec( string str )
     return Vector(float(splitted[0]), float(splitted[1]), float(splitted[2]))
 }
 
+vector function GetDefaultColour()
+{
+	array<string> convar = split(GetConVarString("spn_default_bubble_colour"), " ")
+	return < float(convar[0]), float(convar[1]), float(convar[2]) >
+}
 
+vector function GetDefaultAnimColour()
+{
+	array<string> convar = split(GetConVarString("spn_default_anim_bubble_colour"), " ")
+	return < float(convar[0]), float(convar[1]), float(convar[2]) >
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////                                                                                                       
                                                                                                            
