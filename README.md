@@ -8,7 +8,7 @@ Spoons.Bubbles is a **client-optional, server-sided mod**.
 Players who do not have the mod will see the custom colours, but will not be able to set their own automatically, they would have to use AddCustomBubble (see below) to set their own colour
 
 
-# Setting a colour
+# Setting a colour (out of date)
 
 There are 3 main ways of setting your custom dome shield colour, each with varying levels of permanence.
 
